@@ -1,0 +1,28 @@
+{
+  "schema_version": 2,
+  "plugins": [
+    {
+      "id": "key-chat-access",
+      "name": "Key Chat Access",
+      "description": "Block /v1/chat/completions for selected authenticated CPA callers, before upstream execution.",
+      "author": "Local administration",
+      "version": "0.1.0",
+      "tags": [
+        "Interceptor",
+        "Access"
+      ],
+      "install": {
+        "type": "direct",
+        "artifacts": [
+          {
+            "goos": "linux",
+            "goarch": "amd64",
+            "url": "https://github.com/L1nwatch/key-chat-access/releases/download/v0.1.0/key-chat-access_0.1.0_linux_amd64.zip",
+            "sha256": "c8ef0adb35e57c97e3d36e1c3295e8babe3f52981bcc998729a3eb51e217923d",
+            "size": 2003288
+          }
+        ]
+      }
+    }
+  ]
+}

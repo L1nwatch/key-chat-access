@@ -1,0 +1,5 @@
+__pycache__/
+dist/
+release/
+config.shayan.yaml
+enable.shayan.json
