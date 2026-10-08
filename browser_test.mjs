@@ -10,6 +10,28 @@ const secret = "local-test-management";
 const hash = text => createHash("sha256").update(text).digest("hex");
 const pageURL = base + "/v0/resource/plugins/key-chat-access/settings";
 const configURL = base + "/v8/management/config/plugins/configs/key-chat-access";
+async function checkImageMenu(view) {
+  // Reproduce the exact externally added DOM reported at the page bottom.
+  await view.evaluate(() => {
+    const menu = document.createElement("div"); menu.id = "custom-menu";
+    menu.innerHTML = '<button id="btn-save">保存图片</button><button id="btn-view">预览大图</button><button id="btn-copy">复制图像</button><button id="btn-cancel">取消</button>';
+    menu.querySelector("#btn-save").addEventListener("click", () => { menu.dataset.clicked = "yes"; });
+    document.body.append(menu);
+  });
+  const english = ["Save image", "View full size", "Copy image", "Cancel"];
+  await view.waitForFunction(expected => JSON.stringify([...document.querySelectorAll("#custom-menu button")].map(button => button.textContent)) === JSON.stringify(expected), english);
+  await view.locator("#custom-menu #btn-save").click();
+  assert.equal(await view.locator("#custom-menu").getAttribute("data-clicked"), "yes");
+  await view.locator("#custom-menu #btn-view").evaluate(button => { button.firstChild.data = "预览大图"; });
+  await view.waitForFunction(() => document.querySelector("#custom-menu #btn-view").textContent === "View full size");
+  await view.locator("#custom-menu").evaluate(menu => {
+    const replacement = menu.cloneNode(true);
+    replacement.querySelector("#btn-copy").textContent = "复制图像";
+    menu.remove(); document.body.append(replacement);
+  });
+  await view.waitForFunction(expected => JSON.stringify([...document.querySelectorAll("#custom-menu button")].map(button => button.textContent)) === JSON.stringify(expected), english);
+  await view.locator("#custom-menu").evaluate(menu => menu.remove());
+}
 try {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -79,6 +101,7 @@ try {
   await page.locator("#editor").waitFor({state: "visible"});
   assert.equal(await blocked.isChecked(), true);
   assert.equal(await page.locator("#login").isVisible(), false);
+  await checkImageMenu(page);
   assert.deepEqual(errors, []);
   await page.setViewportSize({width: 390, height: 844});
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -98,6 +121,9 @@ try {
     await page.frameLocator("iframe").locator("#editor").waitFor({state: "visible"});
     assert.equal(await page.frameLocator("iframe").getByRole("checkbox", {name: "Block Shayan from Chat Completions", exact: true}).isChecked(), true);
     const frame = page.frames().find(frame => frame.url().includes("/key-chat-access/settings"));
+    await checkImageMenu(page);
+    await checkImageMenu(frame);
+    console.log("PASS: the reported image menu stays English in the standalone page, embedded page and parent panel; late insertion, text changes and click handlers work");
     const standalone = await page.context().newPage();
     await standalone.goto(pageURL);
     await standalone.locator("#editor").waitFor({state: "visible"});

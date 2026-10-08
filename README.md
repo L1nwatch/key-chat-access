@@ -20,6 +20,8 @@ User names come from API key labels saved by the management panel in your curren
 
 The page follows the management panel's current theme and color palette, including theme switches while it is open. When opened separately, it uses the saved panel theme, or the system preference in automatic mode.
 
+If an image tool adds the reported `#custom-menu` widget, its four image action buttons are kept in English in both this page and its surrounding management panel, including menus inserted after loading. Existing button handlers are preserved.
+
 The page must use HTTPS (localhost also works). It does not save management passwords. If your management panel session was not remembered, enter the same management password when prompted.
 
 ## Open the picker from Edit config
@@ -112,7 +114,7 @@ Browser checks cover login, remembered management sessions, key labels, search, 
 ## Release
 
 ```bash
-python3 package.py --base-url https://github.com/L1nwatch/key-chat-access/releases/download/v0.3.1
+python3 package.py --base-url https://github.com/L1nwatch/key-chat-access/releases/download/v0.3.2
 python3 panel_patch.py
 ```
 
