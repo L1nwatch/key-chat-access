@@ -14,7 +14,10 @@ var webAssets embed.FS
 const resourcePrefix = "/v0/resource/plugins/" + pluginID + "/"
 
 func managementRegistration() pluginapi.ManagementRegistrationResponse {
-	return pluginapi.ManagementRegistrationResponse{Resources: []pluginapi.ResourceRoute{
+	return pluginapi.ManagementRegistrationResponse{Routes: []pluginapi.ManagementRoute{
+		{Method: "GET", Path: panelRoute, Description: "Inspect the optional Edit config shortcut."},
+		{Method: "POST", Path: panelRoute, Description: "Install or restore the verified management panel shortcut with a backup."},
+	}, Resources: []pluginapi.ResourceRoute{
 		{Path: "/settings", Menu: "User Access", Description: "Select users to block Chat Completions without calculating identifiers."},
 		{Path: "/settings.css"},
 		{Path: "/settings.js"},

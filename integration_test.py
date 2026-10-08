@@ -8,6 +8,7 @@ import argparse
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -17,6 +18,7 @@ import urllib.error
 import urllib.request
 
 from package import ARCHIVE_NAME, VERSION, make_release
+from panel_patch import patch_panel
 
 ROOT = Path(__file__).resolve().parent
 BLOCKED = "local-test-blocked-client"
@@ -36,9 +38,12 @@ def request(base, route, data=None, headers=None, method=None):
         return e.code, e.read()
 
 
-def run(binary, upgrade_from=None, playwright_module=None):
+def run(binary, upgrade_from=None, playwright_module=None, panel_html=None):
     with tempfile.TemporaryDirectory(prefix="key-chat-access-test-") as work:
         work = Path(work)
+        if panel_html:
+            (work / "static").mkdir()
+            (work / "static/management.html").write_bytes(panel_html.read_bytes())
         upstream_calls = []
 
         class Mock(BaseHTTPRequestHandler):
@@ -93,7 +98,7 @@ def run(binary, upgrade_from=None, playwright_module=None):
         cfg = {
             "config-version": 8,
             "server": {"host": "127.0.0.1", "port": port},
-            "management": {"secret-key": MANAGEMENT, "disable-control-panel": True, "disable-auto-update-panel": True},
+            "management": {"secret-key": MANAGEMENT, "disable-control-panel": not bool(panel_html), "disable-auto-update-panel": True},
             "access": {"api-keys": [BLOCKED, ALLOWED]},
             "oauth": {"auth-dir": str(work / "auths")},
             "requests": {"proxy-url": "direct"},
@@ -104,14 +109,16 @@ def run(binary, upgrade_from=None, playwright_module=None):
             }]},
             "plugins": {"enabled": True, "dir": str(work / "plugins"), "store-sources": [registry_url],
                         "store-auth": [{"match": mock_base + "/", "type": "none", "allow-insecure": True}],
-                        "configs": {"key-chat-access": {"enabled": True, "priority": 1000,
+                        "configs": {"other-plugin": {"enabled": False}, "key-chat-access": {"enabled": True, "priority": 1000,
                                                            "blocked_caller_scopes": [scope]}}},
         }
         (work / "config.yaml").write_text(json.dumps(cfg))  # JSON is valid YAML.
         management = {"Authorization": "Bearer " + MANAGEMENT}
         with (work / "host.log").open("w") as log:
+            env = os.environ.copy()
+            env["MANAGEMENT_STATIC_PATH"] = str(work / "static")
             host = subprocess.Popen([str(binary), "-config", str(work / "config.yaml"), "-local-model"],
-                                    cwd=work, stdout=log, stderr=subprocess.STDOUT)
+                                    cwd=work, env=env, stdout=log, stderr=subprocess.STDOUT)
             try:
                 for _ in range(100):
                     if host.poll() is not None:
@@ -169,8 +176,34 @@ def run(binary, upgrade_from=None, playwright_module=None):
                 assert request(base, "/v8/management/config/access/api-keys")[0] == 401
                 print("PASS: plugin menu and static UI load, configuration still requires management authentication")
 
+                panel_route = "/v0/management/plugins/key-chat-access/panel-integration"
+                if panel_html:
+                    original_hash = hashlib.sha256(panel_html.read_bytes()).hexdigest()
+                    assert request(base, panel_route)[0] == 401
+                    status, raw = request(base, panel_route, headers=management)
+                    assert status == 200 and json.loads(raw)["compatible"] and not json.loads(raw)["installed"], raw
+                    status, raw = request(base, panel_route, {"action": "install", "expected_sha256": "a" * 64}, management)
+                    assert status == 409, raw
+                    assert hashlib.sha256((work / "static/management.html").read_bytes()).hexdigest() == original_hash
+                    status, raw = request(base, panel_route, {"action": "install", "expected_sha256": original_hash}, management)
+                    assert status == 200 and json.loads(raw)["installed"], raw
+                    installed_hash = json.loads(raw)["sha256"]
+                    assert installed_hash == hashlib.sha256(patch_panel(panel_html.read_bytes())).hexdigest()
+                    status, raw = request(base, panel_route, {"action": "install", "expected_sha256": installed_hash}, management)
+                    assert status == 200 and json.loads(raw)["sha256"] == installed_hash, raw
+                    print("PASS: authenticated panel shortcut installation, stale-write protection, backup and idempotency")
+
                 if playwright_module:
-                    subprocess.run(["node", str(ROOT / "browser_test.mjs"), base, str(playwright_module)], check=True, timeout=60)
+                    command = ["node", str(ROOT / "browser_test.mjs"), base, str(playwright_module)]
+                    if panel_html:
+                        command.append("panel")
+                    subprocess.run(command, check=True, timeout=90)
+
+                if panel_html:
+                    status, raw = request(base, panel_route, {"action": "restore", "expected_sha256": installed_hash}, management)
+                    assert status == 200 and not json.loads(raw)["installed"], raw
+                    assert (work / "static/management.html").read_bytes() == panel_html.read_bytes()
+                    print("PASS: management API restores the original panel byte for byte")
 
                 chat = {"model": "test-chat", "messages": [{"role": "user", "content": "hi"}]}
                 cases = [
@@ -240,5 +273,6 @@ if __name__ == "__main__":
     parser.add_argument("--cpa", required=True, type=Path)
     parser.add_argument("--upgrade-from", type=Path, help="previous v0.1.0 ZIP to verify an API-only upgrade")
     parser.add_argument("--playwright-module", type=Path, help="path to Playwright index.mjs for browser checks")
+    parser.add_argument("--panel-html", type=Path, help="pinned upstream management.html for panel integration checks")
     args = parser.parse_args()
-    run(args.cpa.resolve(), args.upgrade_from, args.playwright_module)
+    run(args.cpa.resolve(), args.upgrade_from, args.playwright_module, args.panel_html)

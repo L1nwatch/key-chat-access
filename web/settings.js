@@ -67,6 +67,14 @@ export async function makeUsers(keys, blocked, apiBase, names = {}) {
 
 export async function boot() {
   const $ = id => document.getElementById(id);
+  document.querySelector(".back").addEventListener("click", event => {
+    try {
+      if (window.top !== window) {
+        const plugins = window.top.document.querySelector('a[href="#/plugins"]');
+        if (plugins) { event.preventDefault(); plugins.click(); }
+      }
+    } catch { /* The normal link remains available outside the same-origin panel. */ }
+  });
   let session;
   try { session = readSession(localStorage, location, navigator.userAgent); }
   catch { session = {key: "", apiBase: location.origin}; }

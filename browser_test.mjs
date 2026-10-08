@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {pathToFileURL} from "node:url";
-const [base, modulePath] = process.argv.slice(2);
+const [base, modulePath, panelMode] = process.argv.slice(2);
 const {chromium} = await import(modulePath ? pathToFileURL(modulePath).href : "playwright");
 const browser = await chromium.launch({headless: true});
 const keyA = "local-test-blocked-client", keyB = "local-test-allowed-client";
@@ -82,5 +82,23 @@ try {
   await page.setViewportSize({width: 390, height: 844});
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await page.screenshot({path: "/tmp/key-chat-access-settings.png", fullPage: true});
+  if (panelMode) {
+    await page.evaluate(() => localStorage.setItem("cli-proxy-language", JSON.stringify({state: {language: "en"}, version: 0})));
+    await page.setViewportSize({width: 1280, height: 900});
+    await page.goto(base + "/management.html#/plugins");
+    await page.getByRole("heading", {name: "key-chat-access", exact: true}).waitFor({state: "visible"});
+    const other = page.locator("article").filter({has: page.getByRole("heading", {name: "other-plugin", exact: true})});
+    await other.getByRole("button", {name: "Edit config", exact: true}).click();
+    await page.getByText("Configure other-plugin", {exact: true}).waitFor({state: "visible"});
+    await page.getByRole("button", {name: "Cancel", exact: true}).click();
+    const target = page.locator("article").filter({has: page.getByRole("heading", {name: "key-chat-access", exact: true})});
+    await target.getByRole("button", {name: "Edit config", exact: true}).click();
+    await page.waitForURL(url => url.hash === "#/plugin-pages/key-chat-access/0");
+    await page.frameLocator("iframe").locator("#editor").waitFor({state: "visible"});
+    assert.equal(await page.frameLocator("iframe").getByRole("checkbox", {name: "Block Shayan from Chat Completions", exact: true}).isChecked(), true);
+    await page.frameLocator("iframe").getByRole("link", {name: /Back to management/}).click();
+    await other.getByRole("button", {name: "Edit config", exact: true}).waitFor({state: "visible"});
+    console.log("PASS: Edit config opens User Access directly; another plugin still opens the standard configuration form");
+  }
   console.log("PASS: browser login/session reuse, names/search, add/remove enforcement, preserved settings, conflict detection, escaped labels, mobile layout");
 } finally { await browser.close(); }

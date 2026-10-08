@@ -127,7 +127,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 		return map[string]any{
 			"schema_version": pluginabi.SchemaVersion,
 			"metadata": pluginapi.Metadata{
-				Name: pluginID, Version: "0.2.1", Author: "Local administration",
+				Name: pluginID, Version: "0.3.0", Author: "Local administration",
 				GitHubRepository: "https://github.com/L1nwatch/key-chat-access",
 				ConfigFields: []pluginapi.ConfigField{{
 					Name: "blocked_caller_scopes", Type: pluginapi.ConfigFieldTypeArray,
@@ -142,6 +142,9 @@ func handleMethod(method string, raw []byte) (any, error) {
 		var req pluginapi.ManagementRequest
 		if err := json.Unmarshal(raw, &req); err != nil {
 			return nil, fmt.Errorf("invalid management envelope")
+		}
+		if req.Path == panelRoute {
+			return panelManagement(req), nil
 		}
 		return managementResource(req), nil
 	case pluginabi.MethodRequestInterceptBefore, pluginabi.MethodRequestInterceptAfter:

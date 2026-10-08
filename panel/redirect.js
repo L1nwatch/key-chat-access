@@ -1,0 +1,1 @@
+/*key-chat-access:edit-config:v1*/if(t.id==="key-chat-access"){let n=t.menus.findIndex(e=>e.path==="/v0/resource/plugins/key-chat-access/settings");if(n>=0){let r="/plugin-pages/"+encodeURIComponent(t.id)+"/"+n,a=document.querySelector('a[href="#'+r+'"]');if(a){a.click();}else{window.location.hash=r;}return;}}

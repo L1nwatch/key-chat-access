@@ -20,6 +20,21 @@ User names come from API key labels saved by the management panel in your curren
 
 The page must use HTTPS (localhost also works). It does not save management passwords. If your management panel session was not remembered, enter the same management password when prompted.
 
+## Open the picker from Edit config
+
+The optional management panel integration redirects **Edit config** for an enabled `key-chat-access` plugin directly to the User Access picker inside the existing management panel. Other plugins retain their standard configuration forms. When this plugin has no active User Access menu, its standard configuration form remains available.
+
+This integration supports the exact upstream management panel **v1.25.6** recorded in `panel/source.json`. It verifies the panel hash, creates a private backup beside the original file, and replaces the file atomically. Installing the plugin alone does not modify the panel.
+
+Use the authenticated management API:
+
+1. `GET /v0/management/plugins/key-chat-access/panel-integration` returns the current `sha256`, `compatible`, and `installed` status.
+2. `POST` to the same path with `{"action":"install","expected_sha256":"<current sha256>"}` installs the shortcut. Unsupported versions and stale hashes are rejected.
+3. Set `management.panel-github-repository` to `https://github.com/L1nwatch/key-chat-access` to keep automatic panel updates on this customized release. Releases include a `management.html` asset derived from the verified upstream version.
+4. Refresh the management panel, then click **Edit config** on `key-chat-access`.
+
+To undo the integration, read the current hash and POST `{"action":"restore","expected_sha256":"<current sha256>"}`. This restores the original panel byte for byte. Restore `management.panel-github-repository` to `https://github.com/router-for-me/Cli-Proxy-API-Management-Center` to resume upstream panel updates. No client keys or access policies are changed by the panel installer.
+
 ## Install or update through the management panel
 
 Tested with CLIProxyAPI **v8.0.4**, commit `d33f63f8`, ABI 1 / RPC schema 6. Prebuilt packages target Linux amd64 with glibc 2.34 or newer.
@@ -95,10 +110,11 @@ Browser checks cover login, remembered management sessions, key labels, search, 
 ## Release
 
 ```bash
-python3 package.py --base-url https://github.com/L1nwatch/key-chat-access/releases/download/v0.2.1
+python3 package.py --base-url https://github.com/L1nwatch/key-chat-access/releases/download/v0.3.0
+python3 panel_patch.py
 ```
 
-Publish the ZIP and checksum file as release assets and copy `release/registry.json` to the repository root. Packages contain only the native library with its embedded static page. Never publish real API keys or personal policies.
+Publish the ZIP, checksum file, registry, patched `management.html`, and `panel/LICENSE` as release assets, then copy `release/registry.json` to the repository root. Packages contain only the native library with its embedded static page and panel patch instructions. Never publish real API keys or personal policies. The custom panel is built from a SHA-256-pinned upstream release; its original MIT license is in `panel/LICENSE`.
 
 ## License and protocol
 

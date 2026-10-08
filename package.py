@@ -7,7 +7,7 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 ARCHIVE_NAME = f"key-chat-access_{VERSION}_linux_amd64.zip"
 
 
