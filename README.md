@@ -16,7 +16,7 @@ Open **User Access** from the plugin's menu, or visit this path on your CPA serv
 
 The page calculates the caller scope automatically. It reads existing CPA API keys and saves only the selected scopes to the plugin configuration. It never creates, removes, or changes client keys. Existing rules, plugin priority, and installation metadata are preserved.
 
-User names come from API key labels saved by the management panel in your current browser. If a key has no label, add one in the management panel and click **Reload** here. Browser labels are local; they do not change authentication. Users sharing a key share the same restriction. After rotating a key, select the new key; unmatched existing rules remain visible until explicitly unchecked.
+User names come from API key labels saved by the management panel in your current browser. If a key has no label, add one in the management panel and click **Reload** here. Browser labels are local; they do not change authentication. Long keys show the first 15 and last 12 characters; shorter keys show fewer characters to keep part of the key concealed. Users sharing a key share the same restriction. After rotating a key, select the new key; unmatched existing rules remain visible until explicitly unchecked.
 
 The page must use HTTPS (localhost also works). It does not save management passwords. If your management panel session was not remembered, enter the same management password when prompted.
 
@@ -95,7 +95,7 @@ Browser checks cover login, remembered management sessions, key labels, search, 
 ## Release
 
 ```bash
-python3 package.py --base-url https://github.com/L1nwatch/key-chat-access/releases/download/v0.2.0
+python3 package.py --base-url https://github.com/L1nwatch/key-chat-access/releases/download/v0.2.1
 ```
 
 Publish the ZIP and checksum file as release assets and copy `release/registry.json` to the repository root. Packages contain only the native library with its embedded static page. Never publish real API keys or personal policies.

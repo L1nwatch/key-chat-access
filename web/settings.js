@@ -54,7 +54,8 @@ export async function makeUsers(keys, blocked, apiBase, names = {}) {
     const label = typeof note === "string" && note.trim() ? note.trim() :
       embeddedName && embeddedName.length <= 80 ? embeddedName : "User " + (index + 1);
     // No raw Key is retained in the view model or written into DOM/storage.
-    const masked = key.length > 24 ? key.slice(0, 5) + "…" + key.slice(-12) : "•••• (Key " + (index + 1) + ")";
+    const prefixLength = Math.min(15, key.length - 12 - 8);
+    const masked = key.length > 24 ? key.slice(0, prefixLength) + "…" + key.slice(-12) : "•••• (Key " + (index + 1) + ")";
     return {scope, label, masked, blocked: blocked.includes(scope), unknown: false};
   }));
   const known = new Set(rows.map(row => row.scope));

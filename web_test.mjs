@@ -53,6 +53,15 @@ test("scope validation prevents malformed or silently dropped policies", () => {
 test("unnamed keys show a searchable suffix while concealing the secret", async () => {
   const key = "sk-" + "AbCdEf0123".repeat(3) + "shayan1234";
   const [user] = await makeUsers([key], [], origin);
+  assert.equal(user.masked, key.slice(0, 15) + "…" + key.slice(-12));
   assert.ok(user.masked.includes("shayan"));
   assert.ok(!JSON.stringify(user).includes(key));
+  for (const length of [24, 25, 26, 27, 28, 35]) {
+    const shortKey = "k".repeat(length);
+    const [short] = await makeUsers([shortKey], [], origin);
+    if (length > 24) {
+      const visible = short.masked.split("…").join("").length;
+      assert.ok(length - visible >= 8);
+    }
+  }
 });
