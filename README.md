@@ -18,6 +18,8 @@ The page calculates the caller scope automatically. It reads existing CPA API ke
 
 User names come from API key labels saved by the management panel in your current browser. If a key has no label, add one in the management panel and click **Reload** here. Browser labels are local; they do not change authentication. Long keys show the first 15 and last 12 characters; shorter keys show fewer characters to keep part of the key concealed. Users sharing a key share the same restriction. After rotating a key, select the new key; unmatched existing rules remain visible until explicitly unchecked.
 
+The page follows the management panel's current theme and color palette, including theme switches while it is open. When opened separately, it uses the saved panel theme, or the system preference in automatic mode.
+
 The page must use HTTPS (localhost also works). It does not save management passwords. If your management panel session was not remembered, enter the same management password when prompted.
 
 ## Open the picker from Edit config
@@ -110,7 +112,7 @@ Browser checks cover login, remembered management sessions, key labels, search, 
 ## Release
 
 ```bash
-python3 package.py --base-url https://github.com/L1nwatch/key-chat-access/releases/download/v0.3.0
+python3 package.py --base-url https://github.com/L1nwatch/key-chat-access/releases/download/v0.3.1
 python3 panel_patch.py
 ```
 

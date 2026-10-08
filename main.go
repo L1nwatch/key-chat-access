@@ -127,7 +127,7 @@ func handleMethod(method string, raw []byte) (any, error) {
 		return map[string]any{
 			"schema_version": pluginabi.SchemaVersion,
 			"metadata": pluginapi.Metadata{
-				Name: pluginID, Version: "0.3.0", Author: "Local administration",
+				Name: pluginID, Version: "0.3.1", Author: "Local administration",
 				GitHubRepository: "https://github.com/L1nwatch/key-chat-access",
 				ConfigFields: []pluginapi.ConfigField{{
 					Name: "blocked_caller_scopes", Type: pluginapi.ConfigFieldTypeArray,

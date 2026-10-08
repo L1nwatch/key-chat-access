@@ -11,7 +11,8 @@ const hash = text => createHash("sha256").update(text).digest("hex");
 const pageURL = base + "/v0/resource/plugins/key-chat-access/settings";
 const configURL = base + "/v8/management/config/plugins/configs/key-chat-access";
 try {
-  const page = await browser.newPage();
+  const context = await browser.newContext();
+  const page = await context.newPage();
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.addInitScript(({base, keyA, keyB}) => {
@@ -96,6 +97,50 @@ try {
     await page.waitForURL(url => url.hash === "#/plugin-pages/key-chat-access/0");
     await page.frameLocator("iframe").locator("#editor").waitFor({state: "visible"});
     assert.equal(await page.frameLocator("iframe").getByRole("checkbox", {name: "Block Shayan from Chat Completions", exact: true}).isChecked(), true);
+    const frame = page.frames().find(frame => frame.url().includes("/key-chat-access/settings"));
+    const standalone = await page.context().newPage();
+    await standalone.goto(pageURL);
+    await standalone.locator("#editor").waitFor({state: "visible"});
+    // Explicit panel themes must override the opposite system preference and
+    // update both open views without reloading or losing unsaved selections.
+    const frameInput = page.frameLocator("iframe").getByRole("checkbox", {name: "Block Alice <script>bad()</script> from Chat Completions", exact: true});
+    await frameInput.check();
+    for (const [name, theme, system] of [["Dark", "dark", "light"], ["Pure White", "white", "dark"], ["Wool Paper", "light", "dark"]]) {
+      await page.emulateMedia({colorScheme: system});
+      await page.getByRole("button", {name: "Theme", exact: true}).click();
+      await page.getByRole("menuitemradio", {name, exact: true}).click();
+      await frame.waitForFunction(theme => document.documentElement.dataset.theme === theme, theme);
+      await standalone.waitForFunction(theme => document.documentElement.dataset.theme === theme, theme);
+      const embedded = await frame.evaluate(() => ({
+        background: getComputedStyle(document.documentElement).backgroundColor,
+        text: getComputedStyle(document.documentElement).color,
+        card: getComputedStyle(document.querySelector(".card")).backgroundColor,
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+      }));
+      const direct = await standalone.evaluate(() => ({
+        background: getComputedStyle(document.documentElement).backgroundColor,
+        text: getComputedStyle(document.documentElement).color,
+        card: getComputedStyle(document.querySelector(".card")).backgroundColor,
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+      }));
+      assert.deepEqual(embedded, direct);
+      assert.equal(embedded.background, await page.locator(".main-content-plugin-resource").evaluate(el => getComputedStyle(el).backgroundColor));
+      assert.equal(embedded.scheme, theme === "dark" ? "dark" : "light");
+      assert.equal(await frameInput.isChecked(), true);
+      await page.screenshot({path: "/tmp/key-chat-access-theme-" + theme + ".png"});
+    }
+    await page.getByRole("button", {name: "Theme", exact: true}).click();
+    await page.getByRole("menuitemradio", {name: "Follow system", exact: true}).click();
+    for (const scheme of ["light", "dark"]) {
+      await page.emulateMedia({colorScheme: scheme});
+      await standalone.emulateMedia({colorScheme: scheme});
+      for (const view of [frame, standalone]) await view.waitForFunction(scheme => getComputedStyle(document.documentElement).colorScheme === scheme, scheme);
+    }
+    await frameInput.uncheck();
+    await page.frameLocator("iframe").locator("#save").click();
+    await page.frameLocator("iframe").locator("#message.success").waitFor();
+    await standalone.close();
+    console.log("PASS: embedded and standalone themes follow panel selection and automatic system changes without losing edits");
     await page.frameLocator("iframe").getByRole("link", {name: /Back to management/}).click();
     await other.getByRole("button", {name: "Edit config", exact: true}).waitFor({state: "visible"});
     console.log("PASS: Edit config opens User Access directly; another plugin still opens the standard configuration form");

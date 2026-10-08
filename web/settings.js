@@ -36,6 +36,32 @@ export function readSession(storage, location, userAgent) {
   return {key: typeof key === "string" ? key.trim() : "", apiBase};
 }
 
+function syncTheme() {
+  const root = document.documentElement;
+  const system = window.matchMedia("(prefers-color-scheme: dark)");
+  const palette = ["--bg-primary", "--bg-secondary", "--text-primary", "--text-secondary", "--border-color", "--primary-color", "--primary-contrast"];
+  let parentRoot;
+  try { if (window.parent !== window) parentRoot = window.parent.document.documentElement; } catch { /* Standalone fallback. */ }
+  function update() {
+    if (parentRoot) {
+      root.dataset.theme = parentRoot.getAttribute("data-theme") || "light";
+      const colors = window.parent.getComputedStyle(parentRoot);
+      for (const name of palette) {
+        const value = colors.getPropertyValue(name).trim();
+        if (value) root.style.setProperty(name, value);
+      }
+      return;
+    }
+    let theme;
+    try { theme = readStored(localStorage, "cli-proxy-theme", location.host, navigator.userAgent)?.state?.theme; } catch { /* Use system preference. */ }
+    root.dataset.theme = ["dark", "white", "light"].includes(theme) ? theme : system.matches ? "dark" : "white";
+  }
+  update();
+  if (parentRoot) new MutationObserver(update).observe(parentRoot, {attributes: true, attributeFilter: ["data-theme", "class", "style"]});
+  window.addEventListener("storage", event => { if (event.key === "cli-proxy-theme" || event.key === null) update(); });
+  system.addEventListener("change", update);
+}
+
 export function normalizeScopes(scopes) {
   if (!Array.isArray(scopes) || scopes.some(s => typeof s !== "string" || !/^[a-fA-F0-9]{64}$/.test(s.trim()))) {
     throw new Error("Existing rules are invalid. Correct the plugin configuration before saving.");
@@ -66,6 +92,7 @@ export async function makeUsers(keys, blocked, apiBase, names = {}) {
 }
 
 export async function boot() {
+  syncTheme();
   const $ = id => document.getElementById(id);
   document.querySelector(".back").addEventListener("click", event => {
     try {

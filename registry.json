@@ -6,7 +6,7 @@
       "name": "Key Chat Access",
       "description": "Block /v1/chat/completions for selected authenticated CPA callers, before upstream execution.",
       "author": "Local administration",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "tags": [
         "Interceptor",
         "Access"
@@ -17,9 +17,9 @@
           {
             "goos": "linux",
             "goarch": "amd64",
-            "url": "https://github.com/L1nwatch/key-chat-access/releases/download/v0.3.0/key-chat-access_0.3.0_linux_amd64.zip",
-            "sha256": "b4b263545c035d191431c1290dd0fe6df9a6042035168248cd8e99799123abca",
-            "size": 2053638
+            "url": "https://github.com/L1nwatch/key-chat-access/releases/download/v0.3.1/key-chat-access_0.3.1_linux_amd64.zip",
+            "sha256": "2eb4e0ded207ada049ece11819d7d871690bdda36eed6b60aaf3ad85b8ae290f",
+            "size": 2054194
           }
         ]
       }
