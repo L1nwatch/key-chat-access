@@ -36,25 +36,18 @@ export function readSession(storage, location, userAgent) {
   return {key: typeof key === "string" ? key.trim() : "", apiBase};
 }
 
-function syncImageMenuLanguage() {
-  const labels = {"btn-save": "Save image", "btn-view": "View full size", "btn-copy": "Copy image", "btn-cancel": "Cancel"};
+function removeImageMenu() {
   const documents = new Set([document]);
   try { documents.add(window.parent.document); } catch { /* Same-origin panel only. */ }
   const observers = [];
   for (const doc of documents) {
     function update() {
-      const menu = doc.getElementById("custom-menu");
-      if (!menu) return;
-      for (const [id, label] of Object.entries(labels)) {
-        const button = menu.querySelector("button#" + id);
-        if (button && button.textContent !== label) button.textContent = label;
-      }
+      doc.querySelectorAll("#custom-menu").forEach(menu => menu.remove());
     }
     update();
-    // The reported menu may be appended or rebuilt after the page loads.
-    // Keep the existing buttons and their event handlers intact.
+    // Keep the unwanted image menu out of User Access if it is added again.
     const observer = new MutationObserver(update);
-    observer.observe(doc.documentElement, {childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["id"]});
+    observer.observe(doc.documentElement, {childList: true, subtree: true, attributes: true, attributeFilter: ["id"]});
     observers.push(observer);
   }
   window.addEventListener("pagehide", event => { if (!event.persisted) observers.forEach(observer => observer.disconnect()); });
@@ -116,7 +109,7 @@ export async function makeUsers(keys, blocked, apiBase, names = {}) {
 }
 
 export async function boot() {
-  syncImageMenuLanguage();
+  removeImageMenu();
   syncTheme();
   const $ = id => document.getElementById(id);
   document.querySelector(".back").addEventListener("click", event => {
