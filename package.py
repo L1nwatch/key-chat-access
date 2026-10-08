@@ -7,7 +7,8 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
-ARCHIVE_NAME = "key-chat-access_0.1.0_linux_amd64.zip"
+VERSION = "0.2.0"
+ARCHIVE_NAME = f"key-chat-access_{VERSION}_linux_amd64.zip"
 
 
 def make_release(base_url, output):
@@ -25,7 +26,7 @@ def make_release(base_url, output):
             "name": "Key Chat Access",
             "description": "Block /v1/chat/completions for selected authenticated CPA callers, before upstream execution.",
             "author": "Local administration",
-            "version": "0.1.0",
+            "version": VERSION,
             "tags": ["Interceptor", "Access"],
             "install": {
                 "type": "direct",

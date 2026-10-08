@@ -16,7 +16,7 @@ import time
 import urllib.error
 import urllib.request
 
-from package import ARCHIVE_NAME, make_release
+from package import ARCHIVE_NAME, VERSION, make_release
 
 ROOT = Path(__file__).resolve().parent
 BLOCKED = "local-test-blocked-client"
@@ -36,7 +36,7 @@ def request(base, route, data=None, headers=None, method=None):
         return e.code, e.read()
 
 
-def run(binary):
+def run(binary, upgrade_from=None, playwright_module=None):
     with tempfile.TemporaryDirectory(prefix="key-chat-access-test-") as work:
         work = Path(work)
         upstream_calls = []
@@ -47,7 +47,7 @@ def run(binary):
 
             def do_GET(self):
                 p = work / "release" / self.path.lstrip("/")
-                if p.name not in ("registry.json", ARCHIVE_NAME) or not p.exists():
+                if p.name not in ("registry.json", ARCHIVE_NAME, "previous.zip") or not p.exists():
                     self.send_error(404)
                     return
                 data = p.read_bytes()
@@ -73,7 +73,15 @@ def run(binary):
 
         mock = ThreadingHTTPServer(("127.0.0.1", 0), Mock)
         mock_base = "http://127.0.0.1:" + str(mock.server_port)
-        make_release(mock_base, work / "release")
+        registry = make_release(mock_base, work / "release")
+        if upgrade_from:
+            old_data = upgrade_from.read_bytes()
+            (work / "release/previous.zip").write_bytes(old_data)
+            previous = json.loads(json.dumps(registry))
+            previous["plugins"][0]["version"] = "0.1.0"
+            previous["plugins"][0]["install"]["artifacts"][0].update(
+                url=mock_base + "/previous.zip", size=len(old_data), sha256=hashlib.sha256(old_data).hexdigest())
+            (work / "release/registry.json").write_text(json.dumps(previous))
         threading.Thread(target=mock.serve_forever, daemon=True).start()
         # Obtain a local free port for the host.
         import socket
@@ -131,6 +139,38 @@ def run(binary):
                 else:
                     raise RuntimeError("Installed plugin did not register: " + raw.decode())
                 print("PASS: plugin installed and loaded using only Management API")
+
+                if upgrade_from:
+                    old_chat = {"model": "test-chat", "messages": [{"role": "user", "content": "hi"}]}
+                    assert request(base, "/v1/chat/completions", old_chat, {"Authorization": "Bearer " + BLOCKED})[0] == 403
+                    (work / "release/registry.json").write_text(json.dumps(registry))
+                    route = "/v8/management/plugins/store/key-chat-access/install?source=" + source_id
+                    status, raw = request(base, route, {"version": VERSION}, management)
+                    assert status == 200, ("upgrade failed", status, raw)
+                    for _ in range(100):
+                        _, raw = request(base, "/v8/management/plugins", headers=management)
+                        item = next(p for p in json.loads(raw)["plugins"] if p["id"] == "key-chat-access")
+                        if item.get("metadata", {}).get("version") == VERSION and item.get("effective_enabled"):
+                            break
+                        time.sleep(.1)
+                    else:
+                        raise RuntimeError("Updated plugin did not register: " + raw.decode())
+                    assert request(base, "/v1/chat/completions", old_chat, {"Authorization": "Bearer " + BLOCKED})[0] == 403
+                    print("PASS: API-only hot upgrade from v0.1.0 preserves the existing block")
+
+                expected_path = "/v0/resource/plugins/key-chat-access/settings"
+                assert any(menu["path"] == expected_path for menu in item["menus"]), item
+                for path, marker in [(expected_path, b"settings.js"),
+                                     (expected_path + ".js", b"callerScope"),
+                                     (expected_path + ".css", b"color-scheme")]:
+                    status, raw = request(base, path)
+                    assert status == 200 and marker in raw, ("static resource", path, status, raw[:100])
+                    assert BLOCKED.encode() not in raw and MANAGEMENT.encode() not in raw
+                assert request(base, "/v8/management/config/access/api-keys")[0] == 401
+                print("PASS: plugin menu and static UI load, configuration still requires management authentication")
+
+                if playwright_module:
+                    subprocess.run(["node", str(ROOT / "browser_test.mjs"), base, str(playwright_module)], check=True, timeout=60)
 
                 chat = {"model": "test-chat", "messages": [{"role": "user", "content": "hi"}]}
                 cases = [
@@ -198,5 +238,7 @@ def run(binary):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cpa", required=True, type=Path)
+    parser.add_argument("--upgrade-from", type=Path, help="previous v0.1.0 ZIP to verify an API-only upgrade")
+    parser.add_argument("--playwright-module", type=Path, help="path to Playwright index.mjs for browser checks")
     args = parser.parse_args()
-    run(args.cpa.resolve())
+    run(args.cpa.resolve(), args.upgrade_from, args.playwright_module)

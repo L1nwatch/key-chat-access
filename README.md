@@ -1,47 +1,44 @@
 # Key Chat Access
 
-CLIProxyAPI 插件：按已鉴权的客户端 API Key，禁止指定用户调用 `/v1/chat/completions`。命中规则后直接返回 HTTP 403，不调用上游模型，流式和非流式均生效。
+A CLIProxyAPI plugin that blocks selected users from `/v1/chat/completions` with HTTP 403 before calling an upstream model. Streaming and non-streaming requests are covered. Other users and the Responses, Messages, legacy Completions, and Models endpoints remain available.
 
-- 可配置多个用户，可随时增删或关闭规则。
-- 其他用户及 Responses、Messages、旧版 `/v1/completions`、模型列表正常使用。
-- 使用 CPA 认证上下文的 `caller_scope` 匹配身份，不依赖客户端自行填写的用户名或身份 Header。
-- 配置中只保存不可逆 caller scope，无需保存原始客户端 API Key。
+## Manage users without calculating identifiers
 
-兼容性：已在 CLIProxyAPI **v8.0.4**（commit `d33f63f8`、ABI 1 / RPC schema 6）上验证。预编译安装包适用于 Linux amd64、glibc 2.34 或更新系统。
+Open **User Access** from the plugin's menu, or visit this path on your CPA server:
 
-## 通过管理页面安装，无需 SSH
+```text
+/v0/resource/plugins/key-chat-access/settings
+```
 
-1. 在 CPA 管理页的配置面板中找到**插件商店源**（`plugins.store-sources`），添加以下地址并保存，保留已有的源：
+1. Connect using your management panel password. A saved session from the same management panel is reused automatically.
+2. Search for the user by their API key label or visible key suffix.
+3. Check **Block** and click **Save settings**. Uncheck and save to restore access.
+
+The page calculates the caller scope automatically. It reads existing CPA API keys and saves only the selected scopes to the plugin configuration. It never creates, removes, or changes client keys. Existing rules, plugin priority, and installation metadata are preserved.
+
+User names come from API key labels saved by the management panel in your current browser. If a key has no label, add one in the management panel and click **Reload** here. Browser labels are local; they do not change authentication. Users sharing a key share the same restriction. After rotating a key, select the new key; unmatched existing rules remain visible until explicitly unchecked.
+
+The page must use HTTPS (localhost also works). It does not save management passwords. If your management panel session was not remembered, enter the same management password when prompted.
+
+## Install or update through the management panel
+
+Tested with CLIProxyAPI **v8.0.4**, commit `d33f63f8`, ABI 1 / RPC schema 6. Prebuilt packages target Linux amd64 with glibc 2.34 or newer.
+
+1. Add this URL to **Plugin store sources** (`plugins.store-sources`), preserving existing sources:
 
    ```text
    https://raw.githubusercontent.com/L1nwatch/key-chat-access/main/registry.json
    ```
 
-2. 确保全局插件开关 `plugins.enabled` 为 `true`。
+2. Enable the global plugin switch (`plugins.enabled`).
+3. Refresh the plugin store, find `key-chat-access`, and install or update it.
+4. Enable `key-chat-access` under plugin management, then open **User Access**.
 
-3. 打开**插件商店**，刷新，搜索 `key-chat-access`，点击安装。CPA 会下载带 SHA-256 校验的安装包并热加载插件。
+Installation and upgrading from v0.1.0 to v0.2.0 were verified using only the management API, without SSH or a server restart. The existing block list is retained. Verify that the plugin is registered and effectively enabled after installation.
 
-4. 在**插件管理**中找到 `key-chat-access`，启用插件，并填写 `blocked_caller_scopes`。空列表允许所有用户。
+## Advanced configuration
 
-5. 确认插件已加载、已启用；用被限制用户的 Key 调用 `/v1/chat/completions` 应返回 HTTP 403，错误码为 `chat_completions_disabled`。
-
-无需正常情况下的服务重启。若页面提示加载失败或必须重启，不应视为规则已生效。
-
-## 生成用户的 caller scope
-
-在自己的电脑上运行：
-
-```bash
-python3 caller_scope.py
-```
-
-按提示输入用户的**客户端 API Key**，输入不会回显，也不会作为命令行参数写入 shell 历史。复制输出的 64 位十六进制字符串到插件配置的 `blocked_caller_scopes` 数组。
-
-scope 与该 Key 精确对应；更换 Key 后需要重新生成。同一个 Key 若多人共用，规则会同时作用于这些人。
-
-## 配置示例
-
-将下面的节点合并到现有 CPA 配置，勿用片段替换完整配置文件：
+The UI manages this configuration for you. Merge this example into an existing CPA configuration; it is not a complete configuration file:
 
 ```yaml
 plugins:
@@ -50,50 +47,59 @@ plugins:
     key-chat-access:
       enabled: true
       priority: 1000
-      blocked_caller_scopes:
-        - "替换为 caller_scope.py 生成的 64 位十六进制字符串"
+      blocked_caller_scopes: []
 ```
 
-- `enabled`：插件开关，关闭后恢复 CPA 原有行为。
-- `blocked_caller_scopes`：禁止调用 Chat Completions 的用户列表，支持多个；空数组允许全部。
-- `priority`：CPA 的插件优先级。
+An empty list allows all users. Disabling the plugin or the global plugin switch also removes restrictions. The User Access page is served by the enabled plugin; re-enable it in the main management panel if you disabled it there.
 
-目前限制的接口固定为 `/v1/chat/completions`。请求在选择上游凭据前终止，使用其他上游模型或改为流式不会绕过规则。插件不阻止用户通过其他保留的协议调用同一个模型。
+For scripts or manual configuration, `python3 caller_scope.py` prompts for a client API key without echoing it or putting it in shell history. Paste the resulting scope into `blocked_caller_scopes`. Scope identity follows the host's `CallerScope` algorithm, including its domain prefix; it is not a plain hash of the key.
+
+The interceptor matches the authenticated host-provided `caller_scope` and `request_path`. Client-supplied usernames and identity headers cannot override them. The restricted endpoint is fixed to `/v1/chat/completions`; other protocols may still invoke the same underlying models.
 
 ## Management API
 
-所有管理请求需要 `Authorization: Bearer <MANAGEMENT_KEY>`，使用管理密码，与客户端 API Key 区分。
+Management requests require `Authorization: Bearer <MANAGEMENT_KEY>`, using the management password, not a client API key.
 
-- `PUT /v8/management/config/plugins/store-sources`：添加自定义源，提交含已有源的完整 URL 数组。
-- `PATCH /v8/management/config/plugins/configs/key-chat-access`：提交插件配置对象。
-- `POST /v8/management/plugins/store/key-chat-access/install?source=<source-id>`：安装，`source-id` 来自 `GET /v8/management/plugins/store` 中该插件的条目。
-- `GET /v8/management/plugins`：确认插件 `registered`、`enabled` 和 `effective_enabled`。
-- `PUT /v8/management/config/plugins/configs/key-chat-access/enabled`：开关，正文直接使用 `true` 或 `false`，无需 `{value: ...}` 包装。
+- `GET /v8/management/config/access/api-keys`: read existing client keys.
+- `PATCH /v8/management/config/plugins/configs/key-chat-access`: update plugin policy fields.
+- `POST /v8/management/plugins/store/key-chat-access/install?source=<source-id>`: install from the source ID returned by `GET /v8/management/plugins/store`.
+- `GET /v8/management/plugins`: verify `registered`, `enabled`, and `effective_enabled`, and locate the User Access menu.
+- `PUT /v8/management/config/plugins/configs/key-chat-access/enabled`: set the switch using a bare JSON `true` or `false` body.
 
-主机关闭全局插件、插件未注册或被停用时，此规则不会执行。安装后应确认插件状态及实际 403 行为。
+Only static assets are served by the public plugin resource routes. Data reads and policy changes use the host's authenticated management API. The page escapes user labels and detects stale policy changes before saving. It patches only `blocked_caller_scopes`.
 
-## 构建与测试
+## Build and test
 
-依赖 Go 1.26 和 C 编译器，使用官方 v8.0.4 的插件类型：
+Requires Go 1.26 and a C compiler. UI helper tests require Node.js 22 or newer.
 
 ```bash
 go test -race ./...
+node --test web_test.mjs
 go build -trimpath -ldflags=-s -buildmode=c-shared -o dist/linux/amd64/key-chat-access.so .
 python3 integration_test.py --cpa /path/to/v8.0.4/cli-proxy-api
 ```
 
-集成测试只使用本地假 Key、模型和上游，包含：通过管理 API 安装及热加载；流式、非流式和 8 MiB 请求体拒绝；Bearer、X-Api-Key、X-Goog-Api-Key、key/auth_token 查询参数的身份一致性；伪造身份字段不能绕过；被拒绝请求的上游调用数为零；其他用户和协议正常；管理 API 开关热更新。
+The integration test uses a local mock upstream and fixture keys. It verifies API-only installation, all supported authentication carriers, streaming and non-streaming blocks, 8 MiB bodies, identity spoofing resistance, zero upstream calls for blocked requests, unaffected users/protocols, and management switch hot reload.
 
-未知配置字段、格式错误或重复的 scope 会被拒绝，插件内部保留原策略。主机是否仍注册并启用插件，仍应通过管理 API 确认。
-
-## 发布自定义源
+To also test upgrading and the actual browser UI, provide the previous release archive and a Playwright module with Chromium installed:
 
 ```bash
-python3 package.py --base-url https://github.com/L1nwatch/key-chat-access/releases/download/v0.1.0
+python3 integration_test.py \
+  --cpa /path/to/v8.0.4/cli-proxy-api \
+  --upgrade-from /path/to/key-chat-access_0.1.0_linux_amd64.zip \
+  --playwright-module /path/to/node_modules/playwright/index.mjs
 ```
 
-将生成的 ZIP 发布为 GitHub Release 附件，将 `release/registry.json` 更新到仓库根目录。插件安装包只包含动态库；用户策略和原始 Key 不应放入公开仓库或安装包。
+Browser checks cover login, remembered management sessions, key labels, search, adding/removing restrictions with actual 403/200 enforcement, preserving hidden rules and installation metadata, concurrent edits, escaped labels, and mobile layout.
 
-## 协议来源
+## Release
 
-原生 ABI 声明参考 [CLIProxyAPI v8.0.4 插件示例](https://github.com/router-for-me/CLIProxyAPI/blob/v8.0.4/examples/plugin/simple/go/main.go)。插件通过官方 `Terminate` / `StatusCode` 响应终止请求。项目采用 MIT 许可。
+```bash
+python3 package.py --base-url https://github.com/L1nwatch/key-chat-access/releases/download/v0.2.0
+```
+
+Publish the ZIP and checksum file as release assets and copy `release/registry.json` to the repository root. Packages contain only the native library with its embedded static page. Never publish real API keys or personal policies.
+
+## License and protocol
+
+MIT. Native ABI declarations follow the [official CLIProxyAPI v8.0.4 plugin example](https://github.com/router-for-me/CLIProxyAPI/blob/v8.0.4/examples/plugin/simple/go/main.go). Requests are stopped using the official `Terminate` / `StatusCode` interceptor response.

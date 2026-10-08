@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Access · Key Chat Access</title>
+  <link rel="stylesheet" href="./settings.css">
+  <script type="module" src="./settings.js"></script>
+</head>
+<body>
+  <main>
+    <a class="back" href="/management.html#/plugins">← Back to management</a>
+    <header>
+      <div><p class="eyebrow">KEY CHAT ACCESS</p><h1>User Access</h1></div>
+      <span class="badge">Chat Completions</span>
+    </header>
+    <p class="intro">Select the users you want to block, then save. Their Chat Completions requests will return 403.</p>
+    <p id="message" role="status" aria-live="polite">Reading management session…</p>
+    <form id="login" class="card" hidden>
+      <h2>Connect to management</h2>
+      <p>Enter your management panel password to load the user list.</p>
+      <label for="password">Management password</label>
+      <div class="login-row"><input id="password" type="password" autocomplete="current-password" required><button type="submit">Connect</button></div>
+      <small>Your password is used only for this page and is not saved by this app.</small>
+    </form>
+    <section id="editor" hidden>
+      <div class="toolbar card">
+        <span class="enabled">Select users to block</span>
+        <div class="actions"><button id="refresh" type="button" class="secondary">Reload</button><button id="save" type="button" disabled>Save settings</button></div>
+      </div>
+      <div class="card users">
+        <div class="list-head"><h2>Users</h2><span id="count"></span></div>
+        <label class="search-label" for="search">Search users</label>
+        <input id="search" type="search" placeholder="Search by name, label, or key suffix" autocomplete="off">
+        <div class="column-head"><span>User / API key</span><span>Block</span></div>
+        <div id="users"></div>
+        <p id="empty" hidden>No matching users.</p>
+      </div>
+      <p class="footnote">Names use API key labels saved in this browser. Add labels in the management panel, then reload this page. Users sharing the same key share the same restriction.</p>
+    </section>
+  </main>
+</body>
+</html>

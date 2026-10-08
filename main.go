@@ -127,15 +127,23 @@ func handleMethod(method string, raw []byte) (any, error) {
 		return map[string]any{
 			"schema_version": pluginabi.SchemaVersion,
 			"metadata": pluginapi.Metadata{
-				Name: pluginID, Version: "0.1.0", Author: "Local administration",
+				Name: pluginID, Version: "0.2.0", Author: "Local administration",
 				GitHubRepository: "https://github.com/L1nwatch/key-chat-access",
 				ConfigFields: []pluginapi.ConfigField{{
 					Name: "blocked_caller_scopes", Type: pluginapi.ConfigFieldTypeArray,
-					Description: "禁止调用 /v1/chat/completions 的客户端 caller_scope 列表；不填写原始 API Key。空列表允许全部。",
+					Description: "Client caller scopes blocked from /v1/chat/completions. Use User Access to select users; an empty list allows everyone.",
 				}},
 			},
-			"capabilities": map[string]bool{"request_interceptor": true},
+			"capabilities": map[string]bool{"request_interceptor": true, "management_api": true},
 		}, nil
+	case pluginabi.MethodManagementRegister:
+		return managementRegistration(), nil
+	case pluginabi.MethodManagementHandle:
+		var req pluginapi.ManagementRequest
+		if err := json.Unmarshal(raw, &req); err != nil {
+			return nil, fmt.Errorf("invalid management envelope")
+		}
+		return managementResource(req), nil
 	case pluginabi.MethodRequestInterceptBefore, pluginabi.MethodRequestInterceptAfter:
 		// Decode only the fields needed by the policy. In particular, don't
 		// base64-decode or parse potentially large client request bodies.
